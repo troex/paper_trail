@@ -16,29 +16,35 @@ module PaperTrail
       # :class_name   the name of a custom Version class.  This class should inherit from Version.
       # :ignore       an array of attributes for which a new `Version` will not be created if only they change.
       # :only         inverse of `ignore` - a new `Version` will be created only for these attributes if supplied
+      # :skip         fields to ignore completely.  As with `ignore`, updates to these fields will not create
+      #               a new `Version`.  In addition, these fields will not be included in the serialized versions
+      #               of the object whenever a new `Version` is created.
       # :meta         a hash of extra data to store.  You must add a column to the `versions` table for each key.
       #               Values are objects or procs (which are called with `self`, i.e. the model with the paper
       #               trail).  See `PaperTrail::Controller.info_for_paper_trail` for how to store data from
       #               the controller.
       # :versions     the name to use for the versions association.  Default is `:versions`.
-      # :version_name the name to use for the method which returns the version the instance was reified from.
+      # :version      the name to use for the method which returns the version the instance was reified from.
       #               Default is `:version`.
       def has_paper_trail(options = {})
         # Lazily include the instance methods so we don't clutter up
         # any more ActiveRecord models than we have to.
         send :include, InstanceMethods
 
-        class_attribute :version_name
-        self.version_name = options[:version_name] || 'version'
+        class_attribute :version_association_name
+        self.version_association_name = options[:version] || :version
 
         # The version this instance was reified from.
-        attr_accessor self.version_name
+        attr_accessor self.version_association_name
 
         class_attribute :version_class_name
         self.version_class_name = options[:class_name] || 'Version'
 
         class_attribute :ignore
         self.ignore = ([options[:ignore]].flatten.compact || []).map &:to_s
+
+        class_attribute :skip
+        self.skip = ([options[:skip]].flatten.compact || []).map &:to_s
 
         class_attribute :only
         self.only = ([options[:only]].flatten.compact || []).map &:to_s
@@ -125,7 +131,7 @@ module PaperTrail
       end
 
       def source_version
-        send self.class.version_name
+        send self.class.version_association_name
       end
 
       def record_create
@@ -191,7 +197,7 @@ module PaperTrail
       end
 
       def object_to_string(object)
-        object.attributes.to_yaml
+        object.attributes.except(*self.class.skip).to_yaml
       end
 
       def changed_notably?
@@ -203,7 +209,7 @@ module PaperTrail
       end
 
       def changed_and_not_ignored
-        changed - self.class.ignore
+        changed - self.class.ignore - self.class.skip
       end
 
       def switched_on?

@@ -215,6 +215,14 @@ This means that only changes to the `title` will save a version of the article:
 
 Passing both `:ignore` and `:only` options will result in the article being saved if a changed attribute is included in `:only` but not in `:ignore`.
 
+You can skip fields altogether with the `:skip` option.  As with `:ignore`, updates to these fields will not create a new `Version`.  In addition, these fields will not be included in the serialised version of the object whenever a new `Version` is created.
+
+For example:
+
+    class Article < ActiveRecord::Base
+      has_paper_trail :skip => [:file_upload]
+    end
+
 
 ## Reverting And Undeleting A Model
 
@@ -327,26 +335,31 @@ To find out who made a `version`'s object look that way, use `version.originator
 
 You can specify custom version subclasses with the `:class_name` option:
 
-    class Post < ActiveRecord::Base
-      has_paper_trail :class_name => 'PostVersion'
-    end
-
     class PostVersion < Version
       # custom behaviour, e.g:
       set_table_name :post_versions
+    end
+
+    class Post < ActiveRecord::Base
+      has_paper_trail :class_name => 'PostVersion'
     end
 
 This allows you to store each model's versions in a separate table, which is useful if you have a lot of versions being created.
 
 Alternatively you could store certain metadata for one type of version, and other metadata for other versions.
 
-You can also specify a custom name for the versions association.  This is useful if you already have a `versions` method on your model.  For example:
+You can also specify custom names for the versions and version associations.  This is useful if you already have `versions` or/and `version` methods on your model.  For example:
 
     class Post < ActiveRecord::Base
-      has_paper_trail :versions => :paper_trail_versions
+      has_paper_trail :versions => :paper_trail_versions,
+                      :version  => :paper_trail_version
 
       # Existing versions method.  We don't want to clash.
       def versions
+        ...
+      end
+      # Existing version method.  We don't want to clash.
+      def version
         ...
       end
     end
@@ -461,7 +474,9 @@ PaperTrail will call your proc with the current article and store the result in 
 N.B.  You must also:
 
 * Add your metadata columns to the `versions` table.
-* Declare your metadata columns using `attr_accessible` like this:
+* Declare your metadata columns using `attr_accessible`.
+
+For example:
 
     # config/initializers/paper_trail.rb
     class Version < ActiveRecord::Base
@@ -623,6 +638,17 @@ Please see the `rails2` branch.
 
 PaperTrail uses Bundler to manage its dependencies (in development and testing).  You can run the tests with `bundle exec rake test`.  (You may need to `bundle install` first.)
 
+It's a good idea to reset PaperTrail before each test so data from one test doesn't spill over another.  For example:
+
+    RSpec.configure do |config|
+      config.before :each do
+        PaperTrail.controller_info = {}
+        PaperTrail.whodunnit = nil
+      end
+    end
+
+You may want to turn PaperTrail off to speed up your tests.  See the "Turning PaperTrail Off/On" section above.
+
 
 ## Articles
 
@@ -661,6 +687,8 @@ Many thanks to:
 * [Eduard Tsech](https://github.com/edtsech)
 * [Mathieu Arnold](https://github.com/mat813)
 * [Nicholas Thrower](https://github.com/throwern)
+* [Benjamin Curtis](https://github.com/stympy)
+* [Peter Harkins](https://github.com/pushcx)
 
 
 ## Inspirations
